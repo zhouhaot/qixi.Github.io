@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>数学函数可视化</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            background: #000;
+            color: white;
+            font-family: 'Arial', sans-serif;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow: hidden;
+        }
+        
+        .container {
+            position: relative;
+            width: 100%;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        
+        canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+        }
+        
+        #functionCanvas {
+            z-index: 3;
+        }
+        
+        #particleCanvas {
+            z-index: 1;
+        }
+        
+        .title {
+            position: absolute;
+            top: 30px;
+            left: 0;
+            width: 100%;
+            text-align: center;
+            z-index: 4;
+            opacity: 0.9;
+        }
+        
+        h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            color: #66ffff;
+            text-shadow: 0 0 15px rgba(102, 255, 255, 0.7);
+            letter-spacing: 2px;
+        }
+        
+        .subtitle {
+            font-size: 1.2rem;
+            color: #88aaff;
+        }
+        
+        .function-display {
+            position: absolute;
+            bottom: 30px;
+            left: 0;
+            width: 100%;
+            text-align: center;
+            z-index: 4;
+            font-size: 1.5rem;
+            color: #66ffff;
+            font-family: 'Courier New', monospace;
+            opacity: 0.8;
+        }
+        
+        .info {
+            position: absolute;
+            right: 30px;
+            top: 30px;
+            z-index: 4;
+            background: rgba(0, 30, 60, 0.6);
+            padding: 15px;
+            border-radius: 10px;
+            max-width: 300px;
+            font-size: 0.9rem;
+            line-height: 1.5;
+            border: 1px solid rgba(100, 200, 255, 0.3);
+        }
+        
+        @keyframes glow {
+            0% {
+                filter: drop-shadow(0 0 5px rgba(102, 255, 255, 0.7));
+            }
+            50% {
+                filter: drop-shadow(0 0 20px rgba(102, 255, 255, 0.9));
+            }
+            100% {
+                filter: drop-shadow(0 0 5px rgba(102, 255, 255, 0.7));
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="title">
+            <h1>让枯燥的数学，冰冷的代码，化成用不凋零的玫瑰</h1>
+        </div>
+        
+        <div class="info">
+            七夕快乐
+        </div>
+        
+        <canvas id="particleCanvas"></canvas>
+        <canvas id="functionCanvas"></canvas>
+        
+        <div class="function-display">
+            y = x^(2/3) + 0.9√(3.3-x²)sin(aπx) | a = <span id="aValue">0</span>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const particleCanvas = document.getElementById('particleCanvas');
+            const particleCtx = particleCanvas.getContext('2d');
+            const functionCanvas = document.getElementById('functionCanvas');
+            const functionCtx = functionCanvas.getContext('2d');
+            const aValueDisplay = document.getElementById('aValue');
+            
+            // 设置Canvas尺寸
+            function resizeCanvases() {
+                const width = window.innerWidth;
+                const height = window.innerHeight;
+                
+                particleCanvas.width = width;
+                particleCanvas.height = height;
+                functionCanvas.width = width;
+                functionCanvas.height = height;
+            }
+            
+            resizeCanvases();
+            window.addEventListener('resize', resizeCanvases);
+            
+            // 粒子系统
+            const particles = [];
+            const particleCount = 100;
+            
+            class Particle {
+                constructor() {
+                    this.reset();
+                }
+                
+                reset() {
+                    this.x = Math.random() * particleCanvas.width;
+                    this.y = Math.random() * particleCanvas.height;
+                    this.size = Math.random() * 3 + 1;
+                    this.speedX = Math.random() * 2 - 1;
+                    this.speedY = Math.random() * 2 - 0.5;
+                    this.color = `hsl(${180 + Math.random() * 60}, 100%, 70%)`;
+                    this.alpha = Math.random() * 0.5 + 0.3;
+                    this.life = Math.random() * 100 + 50;
+                }
+                
+                update() {
+                    this.x += this.speedX;
+                    this.y += this.speedY;
+                    this.life--;
+                    
+                    if (this.life <= 0 || 
+                        this.x < 0 || this.x > particleCanvas.width || 
+                        this.y < 0 || this.y > particleCanvas.height) {
+                        this.reset();
+                    }
+                }
+                
+                draw() {
+                    particleCtx.globalAlpha = this.alpha;
+                    particleCtx.fillStyle = this.color;
+                    particleCtx.beginPath();
+                    particleCtx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+                    particleCtx.fill();
+                }
+            }
+            
+            // 初始化粒子
+            function initParticles() {
+                for (let i = 0; i < particleCount; i++) {
+                    particles.push(new Particle());
+                }
+            }
+            
+            // 绘制粒子
+            function drawParticles() {
+                particleCtx.clearRect(0, 0, particleCanvas.width, particleCanvas.height);
+                
+                // 绘制渐变背景
+                const gradient = particleCtx.createRadialGradient(
+                    particleCanvas.width/2, particleCanvas.height/2, 0,
+                    particleCanvas.width/2, particleCanvas.height/2, Math.max(particleCanvas.width, particleCanvas.height)/2
+                );
+                gradient.addColorStop(0, 'rgba(0, 10, 30, 0.8)');
+                gradient.addColorStop(1, 'rgba(0, 0, 0, 1)');
+                
+                particleCtx.fillStyle = gradient;
+                particleCtx.fillRect(0, 0, particleCanvas.width, particleCanvas.height);
+                
+                // 绘制星空效果
+                for (let i = 0; i < 100; i++) {
+                    const x = Math.random() * particleCanvas.width;
+                    const y = Math.random() * particleCanvas.height;
+                    const radius = Math.random() * 1.5;
+                    
+                    particleCtx.beginPath();
+                    particleCtx.arc(x, y, radius, 0, Math.PI * 2);
+                    particleCtx.fillStyle = `rgba(200, 220, 255, ${Math.random() * 0.8})`;
+                    particleCtx.fill();
+                }
+                
+                // 更新和绘制所有粒子
+                particles.forEach(particle => {
+                    particle.update();
+                    particle.draw();
+                });
+            }
+            
+            // 绘制坐标轴
+            function drawAxes() {
+                const width = functionCanvas.width;
+                const height = functionCanvas.height;
+                const centerX = width / 2;
+                const centerY = height / 2;
+                
+                functionCtx.beginPath();
+                functionCtx.strokeStyle = 'rgba(100, 200, 255, 0.6)';
+                functionCtx.lineWidth = 1.5;
+                
+                // X轴
+                functionCtx.moveTo(0, centerY);
+                functionCtx.lineTo(width, centerY);
+                
+                // Y轴
+                functionCtx.moveTo(centerX, 0);
+                functionCtx.lineTo(centerX, height);
+                
+                functionCtx.stroke();
+                
+                // 绘制刻度
+                const scale = Math.min(width, height) / 15;
+                functionCtx.beginPath();
+                functionCtx.strokeStyle = 'rgba(100, 200, 255, 0.4)';
+                functionCtx.lineWidth = 1;
+                
+                // X轴刻度
+                for (let x = centerX; x < width; x += scale) {
+                    functionCtx.moveTo(x, centerY - 5);
+                    functionCtx.lineTo(x, centerY + 5);
+                }
+                for (let x = centerX; x > 0; x -= scale) {
+                    functionCtx.moveTo(x, centerY - 5);
+                    functionCtx.lineTo(x, centerY + 5);
+                }
+                
+                // Y轴刻度
+                for (let y = centerY; y < height; y += scale) {
+                    functionCtx.moveTo(centerX - 5, y);
+                    functionCtx.lineTo(centerX + 5, y);
+                }
+                for (let y = centerY; y > 0; y -= scale) {
+                    functionCtx.moveTo(centerX - 5, y);
+                    functionCtx.lineTo(centerX + 5, y);
+                }
+                
+                functionCtx.stroke();
+                
+                // 标注原点
+                functionCtx.fillStyle = 'rgba(100, 200, 255, 0.8)';
+                functionCtx.fillText('O', centerX - 12, centerY + 15);
+                
+                // 标注X轴
+                functionCtx.fillText('X', width - 15, centerY - 10);
+                
+                // 标注Y轴
+                functionCtx.fillText('Y', centerX + 10, 15);
+            }
+            
+            // 计算函数值
+            function calculateFunction(x, a) {
+                // 确保x在定义域内
+                if (Math.abs(x) > Math.sqrt(3.3)) return null;
+                
+                const term1 = Math.sign(x) * Math.pow(Math.abs(x), 2/3); // 正确处理x的符号
+                const term2 = 0.9 * Math.sqrt(3.3 - x*x) * Math.sin(a * Math.PI * x);
+                
+                return term1 + term2;
+            }
+            
+            // 绘制函数曲线
+            function drawFunction(a) {
+                const width = functionCanvas.width;
+                const height = functionCanvas.height;
+                const centerX = width / 2;
+                const centerY = height / 2;
+                const scale = Math.min(width, height) / 6;
+                
+                functionCtx.beginPath();
+                
+                // 创建渐变
+                const gradient = functionCtx.createLinearGradient(0, 0, width, 0);
+                gradient.addColorStop(0, '#ff3366');
+                gradient.addColorStop(0.5, '#66ffff');
+                gradient.addColorStop(1, '#3366ff');
+                
+                functionCtx.strokeStyle = gradient;
+                functionCtx.lineWidth = 3;
+                
+                // 绘制曲线
+                const step = 0.01;
+                let isFirstPoint = true;
+                
+                for (let x = -Math.sqrt(3.3); x <= Math.sqrt(3.3); x += step) {
+                    let y = calculateFunction(x, a);
+                    if (y === null) continue;
+                    // x<0 区域 y 取反，实现翻转
+                    if (x < 0) y = -y;
+                    const pixelX = centerX + x * scale;
+                    const pixelY = centerY - y * scale;
+                    if (isFirstPoint) {
+                        functionCtx.moveTo(pixelX, pixelY);
+                        isFirstPoint = false;
+                    } else {
+                        functionCtx.lineTo(pixelX, pixelY);
+                    }
+                }
+                
+                functionCtx.stroke();
+                
+                // 添加发光效果
+                functionCtx.shadowColor = 'rgba(102, 255, 255, 0.7)';
+                functionCtx.shadowBlur = 10;
+                functionCtx.stroke();
+                functionCtx.shadowBlur = 0;
+            }
+            
+            // 动画循环
+            let a = 0;
+            function animate() {
+                a += 0.01;
+                if (a > 10) a = 0;
+                
+                aValueDisplay.textContent = a.toFixed(2);
+                
+                functionCtx.clearRect(0, 0, functionCanvas.width, functionCanvas.height);
+                drawParticles();
+                drawAxes();
+                drawFunction(a);
+                
+                requestAnimationFrame(animate);
+            }
+            
+            // 初始化
+            function init() {
+                initParticles();
+                animate();
+            }
+            
+            init();
+        });
+    </script>
+</body>
+</html>
